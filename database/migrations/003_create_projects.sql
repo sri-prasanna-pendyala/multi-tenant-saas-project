@@ -1,6 +1,11 @@
-CREATE TYPE project_status AS ENUM ('active', 'archived', 'completed');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'project_status') THEN
+    CREATE TYPE project_status AS ENUM ('active', 'archived', 'completed');
+  END IF;
+END$$;
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL,
   name VARCHAR(255) NOT NULL,
@@ -15,4 +20,4 @@ CREATE TABLE projects (
     REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_projects_tenant ON projects(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_projects_tenant ON projects(tenant_id);

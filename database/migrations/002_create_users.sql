@@ -1,6 +1,11 @@
-CREATE TYPE user_role AS ENUM ('super_admin', 'tenant_admin', 'user');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    CREATE TYPE user_role AS ENUM ('super_admin', 'tenant_admin', 'user');
+  END IF;
+END$$;
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY,
   tenant_id UUID,
   email VARCHAR(255) NOT NULL,

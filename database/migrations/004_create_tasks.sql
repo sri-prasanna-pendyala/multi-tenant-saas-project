@@ -1,7 +1,15 @@
-CREATE TYPE task_status AS ENUM ('todo', 'in_progress', 'completed');
-CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_status') THEN
+    CREATE TYPE task_status AS ENUM ('todo', 'in_progress', 'completed');
+  END IF;
 
-CREATE TABLE tasks (
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_priority') THEN
+    CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high');
+  END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY,
   project_id UUID NOT NULL,
   tenant_id UUID NOT NULL,
@@ -21,4 +29,4 @@ CREATE TABLE tasks (
     REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_tasks_tenant_project ON tasks(tenant_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant_project ON tasks(tenant_id, project_id);
