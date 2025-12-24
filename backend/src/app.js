@@ -17,4 +17,7 @@ app.use("/api", userRoutes);
 const projectRoutes = require("./routes/projects.routes");
 app.use("/api", projectRoutes);
 
+const taskRoutes = require("./routes/tasks.routes");
+app.use("/api", taskRoutes);
+
 module.exports = app;
