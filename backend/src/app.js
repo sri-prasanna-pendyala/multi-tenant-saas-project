@@ -11,4 +11,10 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/secure", secureTestRoutes);
 
+const userRoutes = require("./routes/users.routes");
+app.use("/api", userRoutes);
+
+const projectRoutes = require("./routes/projects.routes");
+app.use("/api", projectRoutes);
+
 module.exports = app;
