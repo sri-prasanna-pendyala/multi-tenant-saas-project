@@ -17,45 +17,101 @@ router.post("/register-tenant", async (req, res) => {
     await pool.query("BEGIN");
 
     const tenantId = uuidv4();
+
     await pool.query(
-      `INSERT INTO tenants (id, name, subdomain, subscription_plan, max_users, max_projects)
-       VALUES ($1, $2, $3, 'free', 5, 3)`,
+      `INSERT INTO tenants (
+        id, name, subdomain, status, subscription_plan, max_users, max_projects
+      ) VALUES ($1, $2, $3, 'active', 'free', 5, 3)`,
       [tenantId, tenantName, subdomain]
     );
 
     const passwordHash = await bcrypt.hash(adminPassword, 10);
-
     const userId = uuidv4();
+
     await pool.query(
-      `INSERT INTO users (id, tenant_id, email, password_hash, full_name, role)
-       VALUES ($1, $2, $3, $4, $5, 'tenant_admin')`,
+      `INSERT INTO users (
+        id, tenant_id, email, password_hash, full_name, role
+      ) VALUES ($1, $2, $3, $4, $5, 'tenant_admin')`,
       [userId, tenantId, adminEmail, passwordHash, adminFullName]
     );
 
     await pool.query("COMMIT");
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Tenant registered successfully",
-      data: { tenantId, subdomain }
+      data: {
+        tenantId,
+        subdomain,
+        adminUser: {
+          id: userId,
+          email: adminEmail,
+          fullName: adminFullName,
+          role: "tenant_admin"
+        }
+      }
     });
   } catch (err) {
     await pool.query("ROLLBACK");
-    res.status(400).json({ success: false, message: err.message });
+    return res.status(400).json({ success: false, message: err.message });
   }
 });
-
-/**
- * LOGIN
- */
 router.post("/login", async (req, res) => {
   const { email, password, tenantSubdomain } = req.body;
 
   try {
+    // 🔹 STEP 1: Check if user is super_admin
+    const superAdminRes = await pool.query(
+      `SELECT * FROM users WHERE email=$1 AND role='super_admin'`,
+      [email]
+    );
+
+    if (superAdminRes.rows.length) {
+      const user = superAdminRes.rows[0];
+
+      const match = await bcrypt.compare(password, user.password_hash);
+      if (!match) {
+        return res.status(401).json({ success: false, message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          tenantId: null,
+          role: "super_admin"
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          token,
+          expiresIn: 86400,
+          user: {
+            id: user.id,
+            email: user.email,
+            role: "super_admin",
+            tenantId: null
+          }
+        }
+      });
+    }
+
+    // 🔹 STEP 2: Normal tenant user login (existing logic)
+    if (!tenantSubdomain) {
+      return res.status(400).json({
+        success: false,
+        message: "Tenant subdomain is required"
+      });
+    }
+
     const tenantRes = await pool.query(
       `SELECT * FROM tenants WHERE subdomain=$1`,
       [tenantSubdomain]
     );
+
     if (!tenantRes.rows.length) {
       return res.status(404).json({ success: false, message: "Tenant not found" });
     }
@@ -78,7 +134,11 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, tenantId: user.tenant_id, role: user.role },
+      {
+        userId: user.id,
+        tenantId: user.tenant_id,
+        role: user.role
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
@@ -101,16 +161,51 @@ router.post("/login", async (req, res) => {
   }
 });
 
+
+
 /**
- * ME
+ * GET CURRENT USER
  */
 router.get("/me", auth, async (req, res) => {
-  const userRes = await pool.query(
-    `SELECT id, email, full_name, role FROM users WHERE id=$1`,
-    [req.user.userId]
-  );
+  try {
+    const userRes = await pool.query(
+      `SELECT u.id, u.email, u.full_name, u.role,
+              t.id as tenant_id, t.name, t.subdomain,
+              t.subscription_plan, t.max_users, t.max_projects
+       FROM users u
+       LEFT JOIN tenants t ON u.tenant_id = t.id
+       WHERE u.id=$1`,
+      [req.user.userId]
+    );
 
-  res.json({ success: true, data: userRes.rows[0] });
+    if (!userRes.rows.length) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const row = userRes.rows[0];
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: row.id,
+        email: row.email,
+        fullName: row.full_name,
+        role: row.role,
+        tenant: row.tenant_id
+          ? {
+              id: row.tenant_id,
+              name: row.name,
+              subdomain: row.subdomain,
+              subscriptionPlan: row.subscription_plan,
+              maxUsers: row.max_users,
+              maxProjects: row.max_projects
+            }
+          : null
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 module.exports = router;

@@ -3,21 +3,24 @@ const cors = require("cors");
 
 const authRoutes = require("./routes/auth.routes");
 const secureTestRoutes = require("./routes/secure-test.routes");
+const userRoutes = require("./routes/users.routes");
+const projectRoutes = require("./routes/projects.routes");
+const taskRoutes = require("./routes/tasks.routes");
+const healthRoutes = require("./routes/health.routes");
+const tenantRoutes = require("./routes/tenants.routes");
+
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use("/api", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/tenants", tenantRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api", taskRoutes);
 app.use("/api/secure", secureTestRoutes);
-
-const userRoutes = require("./routes/users.routes");
 app.use("/api", userRoutes);
 
-const projectRoutes = require("./routes/projects.routes");
-app.use("/api", projectRoutes);
-
-const taskRoutes = require("./routes/tasks.routes");
-app.use("/api", taskRoutes);
 
 module.exports = app;

@@ -27,18 +27,15 @@ services:
       DB_NAME: saas_db
       DB_USER: postgres
       DB_PASSWORD: postgres
-    volumes:
-      - ./database:/app/database
+      JWT_SECRET: dev_secret_key_32_chars_minimum
+      FRONTEND_URL: http://frontend:3000
     depends_on:
       database:
         condition: service_healthy
 
-
-
   frontend:
-    image: node:18
+    build: ./frontend
     container_name: frontend
-    command: "node -e \"console.log('frontend placeholder')\""
     ports:
       - "3000:3000"
     depends_on:
